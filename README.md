@@ -4,10 +4,9 @@
 
 ## Запуск
 
-1. `cd api && docker compose up --build` — PostgreSQL и API на `http://localhost:3001`.
-2. В другом терминале: `cd frontend && npm install && npm run dev` — интерфейс на `http://localhost:5173`.
+Из корня проекта выполните `docker compose up --build -d`. Интерфейс будет доступен на `http://localhost:5173`. Запросы `/api` идут через фронтенд-контейнер к API; порты API и PostgreSQL на хост не открываются.
 
-API создаёт таблицы при первом запуске. Данные сохраняются в Docker volume `road_postgres`.
+API создаёт таблицы при первом запуске. PostgreSQL хранит рабочие данные в Docker volume `road_road_postgres`, а сервис `backup` каждые 30 секунд сохраняет архив базы в файл `data/backup/road.dump` на хосте через bind mount. При создании пустого volume база автоматически восстанавливается из этого файла. Исходный архив миграции сохранён отдельно в `data/backup/road-pre-compose.dump`.
 
 ## Управление
 
