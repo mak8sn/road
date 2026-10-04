@@ -43,12 +43,17 @@ export function layoutGraph(graph: Graph, viewportWidth: number, viewportHeight:
   const createdKey = (nodes: Node[]) => nodes.map(node => node.createdAt).sort()[0];
   const dates = [...new Set(onCanvas.map(node => node.eventDate).filter((date): date is string => !!date))].sort();
   const columnForDate = new Map(dates.map((date, index) => [date, index]));
-  components.sort((a, b) => createdKey(a).localeCompare(createdKey(b)) || dateKey(a).localeCompare(dateKey(b)));
+  const sectionNumber = new Map(graph.sections.map(section => [section.id, section.number]));
+  const sectionComponents = components.filter(component => component.length > 1).sort((a, b) => {
+    const number = (component: Node[]) => Math.min(...component.map(node => sectionNumber.get(node.sectionId || '') ?? Infinity));
+    return number(a) - number(b) || createdKey(a).localeCompare(createdKey(b)) || a[0].id.localeCompare(b[0].id);
+  });
+  const looseNodes = components.filter(component => component.length === 1).map(component => component[0]);
 
   const raw = new Map<string, { row: number; col: number }>();
   let nextRow = 0;
-  for (const component of components) {
-    // Creation time chooses the row; event date independently chooses the column.
+  for (const component of sectionComponents) {
+    // Each linked section reserves a vertical block before any loose squares.
     const startCol = columnForDate.get(dateKey(component)) ?? dates.length;
     const componentIds = new Set(component.map(node => node.id));
     const roots = component.filter(node => incoming.get(node.id)!.filter(id => componentIds.has(id)).length === 0)
@@ -71,8 +76,19 @@ export function layoutGraph(graph: Graph, viewportWidth: number, viewportHeight:
     for (const root of roots) place(root.id, nextRow++, startCol);
     // Corrupt legacy cycles cannot trap layout; place any remaining nodes independently.
     for (const node of component) if (!placed.has(node.id)) place(node.id, nextRow++, startCol);
-
   }
+
+  // Loose dated squares fill each date column from the first free row below
+  // all sections. Columns share rows; only the tallest one adds canvas height.
+  let looseRows = 0;
+  for (const date of dates) {
+    const column = columnForDate.get(date)!;
+    const columnNodes = looseNodes.filter(node => node.eventDate === date)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+    columnNodes.forEach((node, index) => raw.set(node.id, { row: nextRow + index, col: column }));
+    looseRows = Math.max(looseRows, columnNodes.length);
+  }
+  nextRow += looseRows;
 
   // Dates are shared column anchors across every chain. Reserve extra columns
   // between two dates only when a linked path actually needs that much room.

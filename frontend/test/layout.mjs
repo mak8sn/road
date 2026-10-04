@@ -47,6 +47,32 @@ test('an undated step between two dates adds room for all chains', () => {
   assert.ok(positions.get('middle').x < positions.get('oct-8-a').x);
 });
 
+test('sections precede loose squares, which stack by creation time within each date', () => {
+  const inSection = (id, date, createdAt, sectionId) => ({ ...node(id, date, createdAt), sectionId });
+  const graph = {
+    nodes: [
+      node('oct-5-late', '2026-10-05', '2026-10-05T00:00:00Z'),
+      inSection('section-2-start', '2026-10-07', '2026-10-03T00:00:00Z', 'section-2'),
+      node('oct-8', '2026-10-08', '2026-10-01T00:00:00Z'),
+      inSection('section-1-start', '2026-10-05', '2026-10-02T00:00:00Z', 'section-1'),
+      node('oct-5-early', '2026-10-05', '2026-10-01T00:00:00Z'),
+      inSection('section-2-end', '2026-10-08', '2026-10-04T00:00:00Z', 'section-2'),
+      inSection('section-1-end', '2026-10-06', '2026-10-03T00:00:00Z', 'section-1'),
+      inSection('section-1-branch', '2026-10-06', '2026-10-04T00:00:00Z', 'section-1'),
+    ],
+    links: [link('section-1-start', 'section-1-end'), { ...link('section-1-start', 'section-1-branch'), order: 1 }, link('section-2-start', 'section-2-end')],
+    sections: [{ id: 'section-1', number: 1, name: null }, { id: 'section-2', number: 2, name: null }],
+  };
+  const positions = layoutGraph(graph, 1200, 800).positions;
+  assert.ok(positions.get('section-1-start').y < positions.get('section-2-start').y);
+  assert.ok(positions.get('section-1-branch').y < positions.get('section-2-start').y);
+  assert.ok(positions.get('section-2-start').y < positions.get('oct-5-early').y);
+  assert.equal(positions.get('oct-5-early').y, positions.get('oct-8').y);
+  assert.ok(positions.get('oct-5-early').y < positions.get('oct-5-late').y);
+  assert.equal(positions.get('section-1-start').x, positions.get('oct-5-early').x);
+  assert.equal(positions.get('section-2-end').x, positions.get('oct-8').x);
+});
+
 test('expanded card opens inward at viewport edges', () => {
   const visible = { left: 0, top: 0, right: 900, bottom: 600 };
   assert.deepEqual(expandedCardShift({ x: 15, y: 20 }, { width: 600, height: 300 }, visible), { x: 285, y: 130 });
